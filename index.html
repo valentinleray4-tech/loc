@@ -179,7 +179,7 @@
             document.getElementById('totalCaution').innerText = totalC.toFixed(2) + " €";
         }
 
-       window.confirmerReservation = async () => {
+      window.confirmerReservation = async () => {
     const nom = document.getElementById('nom_loueur').value;
     const email = document.getElementById('email_loueur').value;
     const tel = document.getElementById('tel_loueur').value;
@@ -190,107 +190,103 @@
     const btn = document.getElementById('submitBtn');
 
     if (!nom || !email || !debut || !fin || panier.length === 0) {
-        alert("Veuillez remplir toutes les informations.");
+        alert("Informations manquantes.");
         return;
     }
 
     btn.disabled = true;
-    btn.innerText = "Génération en cours...";
+    btn.innerText = "Capture en cours...";
 
-    // 1. Préparation de l'élément HTML (Ton modèle exact)
-    const element = document.createElement('div');
-    element.style.padding = "30px";
-    element.style.width = "750px"; 
-    element.style.backgroundColor = "white";
-    element.innerHTML = `
-        <div style="font-family: Arial, sans-serif; color: #000; line-height: 1.4;">
-            <h2 style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px;">
-                CONTRAT DE LOCATION - ECOLE SAINTE ANNE CASSON
-            </h2>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
+    // 1. Création du gabarit (ton modèle)
+    const container = document.createElement('div');
+    container.id = 'pdf-render-zone';
+    // CRITIQUE : L'élément doit être dans le DOM et visible (même un peu) pour html2canvas
+    container.style.position = 'fixed';
+    container.style.left = '0';
+    container.style.top = '0';
+    container.style.width = '800px'; 
+    container.style.zIndex = '-1'; 
+    container.style.background = 'white';
+
+    container.innerHTML = `
+        <div style="padding: 40px; font-family: Arial, sans-serif; color: black;">
+            <h2 style="text-align: center; border-bottom: 2px solid black; padding-bottom: 10px;">CONTRAT DE LOCATION - ECOLE SAINTE ANNE CASSON</h2>
+            <div style="display: flex; justify-content: space-between; margin-top: 20px;">
                 <div>
-                    <h3 style="margin: 0;">OGEC SERVICE LOCATION</h3>
-                    <p style="margin: 0;">ECOLE SAINTE ANNE<br>2 Rue du château<br>44390 CASSON<br>location.ecolesteanne@gmail.com</p>
+                    <strong>OGEC SERVICE LOCATION</strong><br>
+                    2 Rue du château, 44390 CASSON<br>
+                    location.ecolesteanne@gmail.com
                 </div>
-                <div style="text-align: right; border: 1px solid #ccc; padding: 10px; border-radius: 5px; min-width: 200px;">
-                    <p style="margin: 0;"><strong>${nom}</strong></p>
-                    <p style="margin: 0;">Tél : ${tel}</p>
-                    <p style="margin: 0;">Mail : ${email}</p>
+                <div style="text-align: right; border: 1px solid #ccc; padding: 10px;">
+                    <strong>${nom}</strong><br>Tél: ${tel}<br>Mail: ${email}
                 </div>
             </div>
-            <div style="margin-bottom: 20px;">
-                <h4 style="background: #e5e7eb; padding: 5px; margin-bottom: 5px;">1- Date de Location:</h4>
-                <p style="margin-left: 10px;"><strong>Date de départ :</strong> ${debut} &nbsp;&nbsp;&nbsp; <strong>Date de retour :</strong> ${fin}</p>
-            </div>
-            <div style="margin-bottom: 20px;">
-                <h4 style="background: #e5e7eb; padding: 5px; margin-bottom: 10px;">2- Matériels loués :</h4>
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="border-bottom: 2px solid #000;">
-                            <th style="padding: 8px; text-align: left;">Articles</th>
-                            <th style="padding: 8px; text-align: center;">Quantités</th>
-                            <th style="padding: 8px; text-align: right;">Prix/unités</th>
-                            <th style="padding: 8px; text-align: right;">Caution/unités</th>
-                            <th style="padding: 8px; text-align: right;">Prix Total</th>
+            <p style="margin-top: 20px; background: #eee; padding: 5px;"><strong>Dates :</strong> du ${debut} au ${fin}</p>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                <thead>
+                    <tr style="border-bottom: 2px solid black;">
+                        <th align="left">Articles</th><th align="center">Qté</th><th align="right">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${panier.map(a => `
+                        <tr style="border-bottom: 1px solid #ddd;">
+                            <td style="padding: 8px;">${a.nom}</td>
+                            <td align="center">${a.qty}</td>
+                            <td align="right">${(a.qty * a.prix).toFixed(2)} €</td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        ${panier.map(a => `
-                            <tr style="border-bottom: 1px solid #eee;">
-                                <td style="padding: 8px;">${a.nom}</td>
-                                <td style="padding: 8px; text-align: center;">${a.qty}</td>
-                                <td style="padding: 8px; text-align: right;">${a.prix.toFixed(2)} €</td>
-                                <td style="padding: 8px; text-align: right;">${(a.caution_unitaire || 10).toFixed(2)} €</td>
-                                <td style="padding: 8px; text-align: right;">${(a.qty * a.prix).toFixed(2)} €</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+                    `).join('')}
+                </tbody>
+            </table>
+            <div style="margin-top: 20px; border: 2px solid black; padding: 10px; width: fit-content; margin-left: auto;">
+                <strong>Total : ${totalP}</strong><br><strong>Caution : ${totalC}</strong>
             </div>
-            <div style="margin-bottom: 20px; border: 1px solid #000; padding: 10px;">
-                <h4 style="margin: 0 0 5px 0;">3- Montant à régler/Caution:</h4>
-                <p style="margin: 3px 0;"><strong>Montant Total à régler :</strong> ${totalP}</p>
-                <p style="margin: 3px 0;"><strong>Montant chèque de caution :</strong> ${totalC}</p>
-            </div>
-            <div style="margin-bottom: 20px;">
-                <h4 style="background: #e5e7eb; padding: 5px; margin-bottom: 5px;">4- Etat du matériel:</h4>
-                <div style="border: 1px solid #ccc; height: 40px; padding: 5px; color: #666;">Remarques/observations :</div>
-            </div>
-            <div style="margin-bottom: 20px; font-size: 10px;">
-                <h4 style="background: #e5e7eb; padding: 5px; margin-bottom: 5px; font-size: 11px;">5- Conditions:</h4>
-                <p style="margin: 0;">• Une caution sera demandée lors de la remise du matériel.</p>
-                <p style="margin: 0;">• La caution ne sera pas encaissée sauf en cas de détérioration, perte ou non-restitution du matériel.</p>
-                <p style="margin: 0;">• Le locataire est responsable du matériel pendant toute la durée de la location.</p>
-                <p style="margin: 10px 0; font-weight: bold; text-align: center;">CE CONTRAT NE FAIT FOI QU'APRÈS CONFIRMATION PAR L'OGEC</p>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-top: 40px;">
-                <div style="width: 40%; border-top: 1px solid #000; padding-top: 5px;">Signature OGEC :</div>
-                <div style="width: 40%; border-top: 1px solid #000; padding-top: 5px;">Signature loueur :</div>
+            <div style="margin-top: 30px; font-size: 10px;">
+                <p>• Le matériel doit être restitué propre et en bon état.</p>
+                <p>• Le locataire est responsable du matériel pendant la location.</p>
             </div>
         </div>
     `;
 
-    // 2. Configuration du Worker
+    document.body.appendChild(container);
+
+    // 2. LA MAGIE : On attend que le navigateur dessine réellement l'élément
+    await new Promise(resolve => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                setTimeout(resolve, 500); // Pause de sécurité supplémentaire
+            });
+        });
+    });
+
     const opt = {
-        margin: 10,
-        filename: `Contrat_${nom.replace(/\s+/g, '_')}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, logging: false, useCORS: true },
+        margin: 0,
+        filename: `Contrat_${nom}.pdf`,
+        image: { type: 'jpeg', quality: 1 },
+        html2canvas: { 
+            scale: 2, 
+            useCORS: true, 
+            logging: false,
+            backgroundColor: '#ffffff' // Force le fond blanc
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
     try {
-        // --- LA SÉQUENCE CRITIQUE ---
-        // On crée le worker
-        const worker = html2pdf().set(opt).from(element);
-
-        // A. On sauvegarde d'abord (téléchargement client)
+        const worker = html2pdf().set(opt).from(container);
+        
+        // Exécution de la sauvegarde
         await worker.save();
-
-        // B. On récupère le BLOB à partir du même worker SANS relancer le rendu
+        
+        // Récupération du Blob pour Supabase
         const pdfBlob = await worker.output('blob');
 
-        // 3. Envoi vers Supabase Database
+        // Nettoyage immédiat
+        document.body.removeChild(container);
+
+        // 3. Suite Supabase
+        btn.innerText = "Envoi serveur...";
+        
         const { error: dbError } = await supabase.from('reservations').insert([{
             nom_loueur: nom, email: email, telephone: tel,
             date_debut: debut, date_fin: fin, articles: panier,
@@ -298,39 +294,28 @@
         }]);
         if (dbError) throw dbError;
 
-        // 4. Upload vers Supabase Storage
         const cleanNom = nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '_');
         const fileName = `${Date.now()}_${cleanNom}.pdf`;
 
         const { error: storageError } = await supabase.storage
             .from('contrats')
             .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
+        
         if (storageError) throw storageError;
 
-        // 5. Récupération URL et Envoi EmailJS
         const { data: { publicUrl } } = supabase.storage.from('contrats').getPublicUrl(fileName);
 
         await emailjs.send('service_63g35od', 'template_gb5d2wt', {
-            nom_loueur: nom,
-            email_destinataire: email,
-            lien_pdf: publicUrl
+            nom_loueur: nom, email_destinataire: email, lien_pdf: publicUrl
         });
 
-        // 6. Succès
-        document.getElementById('inventory').innerHTML = `
-            <div class="col-span-full bg-white p-10 rounded-2xl shadow-xl text-center">
-                <div class="text-green-500 text-5xl mb-4">✅</div>
-                <h2 class="text-2xl font-bold">Réservation validée !</h2>
-                <p class="text-gray-500 mb-6">Le contrat a été téléchargé et envoyé par email.</p>
-                <button onclick="window.location.reload()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg">Fermer</button>
-            </div>`;
-        panier = []; majPanier();
+        alert("Succès ! Contrat envoyé.");
+        window.location.reload();
 
     } catch (err) {
         console.error(err);
-        alert("Erreur lors de la procédure : " + err.message);
+        alert("Erreur: " + err.message);
         btn.disabled = false;
-        btn.innerText = "Confirmer la réservation";
     }
 };
         fetchMateriels();
