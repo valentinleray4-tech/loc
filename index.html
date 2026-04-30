@@ -179,105 +179,128 @@
             document.getElementById('totalCaution').innerText = totalC.toFixed(2) + " €";
         }
 
-        window.confirmerReservation = async () => {
-            const nom = document.getElementById('nom_loueur').value;
-            const email = document.getElementById('email_loueur').value;
-            const tel = document.getElementById('tel_loueur').value;
-            const debut = document.getElementById('date_debut').value;
-            const fin = document.getElementById('date_fin').value;
-            const totalP = document.getElementById('totalPrix').innerText;
-            const totalC = document.getElementById('totalCaution').innerText;
-            const btn = document.getElementById('submitBtn');
+       window.confirmerReservation = async () => {
+    const nom = document.getElementById('nom_loueur').value;
+    const email = document.getElementById('email_loueur').value;
+    const tel = document.getElementById('tel_loueur').value;
+    const debut = document.getElementById('date_debut').value;
+    const fin = document.getElementById('date_fin').value;
+    const totalP = document.getElementById('totalPrix').innerText;
+    const totalC = document.getElementById('totalCaution').innerText;
+    const btn = document.getElementById('submitBtn');
 
-            if (!nom || !email || !debut || !fin || panier.length === 0) {
-                alert("Veuillez remplir toutes les informations et choisir du matériel.");
-                return;
-            }
+    if (!nom || !email || !debut || !fin || panier.length === 0) {
+        alert("Veuillez remplir toutes les informations et choisir du matériel.");
+        return;
+    }
 
-            btn.disabled = true;
-            btn.innerText = "Traitement en cours...";
+    btn.disabled = true;
+    btn.innerText = "Génération du contrat...";
 
-            try {
-                // 1. Enregistrement des données dans Supabase
-                const { error: insertError } = await supabase.from('reservations').insert([{
-                    nom_loueur: nom, email: email, telephone: tel,
-                    date_debut: debut, date_fin: fin, articles: panier,
-                    total_prix: parseFloat(totalP), total_caution: parseFloat(totalC)
-                }]);
-                if (insertError) throw insertError;
+    try {
+        // 1. Création de l'élément de rendu avec une largeur fixe pour éviter l'aléatoire
+        const element = document.createElement('div');
+        element.style.width = "700px"; // Largeur fixe pour stabiliser le rendu canvas
+        element.style.padding = "30px";
+        element.style.backgroundColor = "white";
+        element.innerHTML = `
+            <div style="font-family: Arial, sans-serif; color: #000; line-height: 1.4;">
+                <h2 style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px;">CONTRAT DE LOCATION - ECOLE SAINTE ANNE</h2>
+                <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+                    <div><strong>OGEC SERVICE LOCATION</strong><br>2 Rue du château, 44390 CASSON</div>
+                    <div style="text-align: right; border: 1px solid #ccc; padding: 10px;"><strong>${nom}</strong><br>${tel}<br>${email}</div>
+                </div>
+                <div style="margin-top: 20px; background: #f3f4f6; padding: 10px;"><strong>Dates :</strong> du ${debut} au ${fin}</div>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                    <thead><tr style="border-bottom: 2px solid #000;"><th align="left">Article</th><th>Qté</th><th align="right">Total</th></tr></thead>
+                    <tbody>
+                        ${panier.map(a => `<tr style="border-bottom: 1px solid #eee;"><td style="padding:8px">${a.nom}</td><td align="center">${a.qty}</td><td align="right">${(a.qty * a.prix).toFixed(2)} €</td></tr>`).join('')}
+                    </tbody>
+                </table>
+                <div style="margin-top: 20px; border: 1px solid #000; padding: 10px;">
+                    <strong>Total à régler : ${totalP}</strong><br><strong>Caution : ${totalC}</strong>
+                </div>
+                <div style="margin-top: 30px; border-top: 1px solid #000; padding-top: 10px; font-size: 10px;">
+                    <p>• Le matériel doit être rendu propre et en bon état.</p>
+                    <p>• La caution n'est encaissée qu'en cas de dégradation ou perte.</p>
+                </div>
+            </div>
+        `;
 
-                // 2. Construction du PDF
-                const element = document.createElement('div');
-                element.style.padding = "30px";
-                element.innerHTML = `
-                    <div style="font-family: Arial, sans-serif; color: #000; line-height: 1.4;">
-                        <h2 style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px;">CONTRAT DE LOCATION - ECOLE SAINTE ANNE</h2>
-                        <div style="display: flex; justify-content: space-between; margin-top: 20px;">
-                            <div><strong>OGEC SERVICE LOCATION</strong><br>2 Rue du château, 44390 CASSON</div>
-                            <div style="text-align: right; border: 1px solid #ccc; padding: 10px;"><strong>${nom}</strong><br>${tel}<br>${email}</div>
-                        </div>
-                        <div style="margin-top: 20px; background: #f3f4f6; padding: 10px;"><strong>Dates :</strong> du ${debut} au ${fin}</div>
-                        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-                            <thead><tr style="border-bottom: 2px solid #000;"><th align="left">Article</th><th>Qté</th><th align="right">Total</th></tr></thead>
-                            <tbody>
-                                ${panier.map(a => `<tr style="border-bottom: 1px solid #eee;"><td style="padding:8px">${a.nom}</td><td align="center">${a.qty}</td><td align="right">${(a.qty * a.prix).toFixed(2)} €</td></tr>`).join('')}
-                            </tbody>
-                        </table>
-                        <div style="margin-top: 20px; border: 1px solid #000; padding: 10px;">
-                            <strong>Total à régler : ${totalP}</strong><br><strong>Caution : ${totalC}</strong>
-                        </div>
-                        <div style="margin-top: 20px; font-size: 10px;">
-                            <p>• Le matériel doit être rendu propre et en bon état.</p>
-                            <p>• La caution n'est encaissée qu'en cas de dégradation ou perte.</p>
-                        </div>
-                    </div>
-                `;
+        // On l'ajoute temporairement au body mais hors écran pour que le rendu soit stable
+        element.style.position = "absolute";
+        element.style.left = "-9999px";
+        document.body.appendChild(element);
 
-                const options = {
-                    margin: 10, filename: `Contrat_${nom.replace(/ /g, '_')}.pdf`,
-                    html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                };
-
-                // 3. Téléchargement pour l'utilisateur
-                await html2pdf().set(options).from(element).save();
-
-                // 4. Génération du Blob pour Supabase Storage
-                const pdfBlob = await html2pdf().set(options).from(element).output('blob');
-                const fileName = `contrats/${Date.now()}_${nom.replace(/ /g, '_')}.pdf`;
-
-                // 5. Upload vers Supabase Storage
-                const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('contrats')
-                    .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
-                if (uploadError) throw uploadError;
-
-                // 6. Récupération URL publique
-                const { data: { publicUrl } } = supabase.storage.from('contrats').getPublicUrl(fileName);
-
-                // 7. Envoi EmailJS
-                await emailjs.send('service_63g35od', 'template_gb5d2wt', {
-                    nom_loueur: nom,
-                    email_destinataire: email,
-                    lien_pdf: publicUrl
-                });
-
-                // Succès
-                document.getElementById('inventory').innerHTML = `
-                    <div class="col-span-full bg-white p-10 rounded-2xl shadow-xl text-center">
-                        <div class="text-green-500 text-5xl mb-4">✅</div>
-                        <h2 class="text-2xl font-bold">Demande envoyée !</h2>
-                        <p class="text-gray-500 mb-6">Le contrat a été généré et envoyé par mail. L'OGEC vous contactera bientôt.</p>
-                        <button onclick="window.location.reload()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg">Nouvelle réservation</button>
-                    </div>`;
-                panier = []; majPanier();
-
-            } catch (err) {
-                console.error(err);
-                alert("Erreur : " + err.message);
-                btn.disabled = false;
-                btn.innerText = "Confirmer la réservation";
-            }
+        const options = {
+            margin: 10,
+            filename: `Contrat_${nom.replace(/\s+/g, '_')}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { 
+                scale: 2, 
+                useCORS: true, 
+                letterRendering: true,
+                logging: false 
+            },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
+
+        // On attend un court instant que le navigateur "dessine" l'élément
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // 2. Génération et téléchargement
+        await html2pdf().set(options).from(element).save();
+
+        // 3. Transformation en Blob pour Supabase
+        const pdfBlob = await html2pdf().set(options).from(element).output('blob');
+        
+        // Nettoyage de l'élément temporaire
+        document.body.removeChild(element);
+
+        // 4. Enregistrement Base de données
+        const { error: insertError } = await supabase.from('reservations').insert([{
+            nom_loueur: nom, email: email, telephone: tel,
+            date_debut: debut, date_fin: fin, articles: panier,
+            total_prix: parseFloat(totalP), total_caution: parseFloat(totalC)
+        }]);
+        if (insertError) throw insertError;
+
+        // 5. Upload Storage
+        const cleanNom = nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '_');
+        const fileName = `${Date.now()}_${cleanNom}.pdf`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('contrats')
+            .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
+        
+        if (uploadError) throw uploadError;
+
+        // 6. URL Publique et Email
+        const { data: { publicUrl } } = supabase.storage.from('contrats').getPublicUrl(fileName);
+
+        await emailjs.send('service_63g35od', 'template_gb5d2wt', {
+            nom_loueur: nom,
+            email_destinataire: email,
+            lien_pdf: publicUrl
+        });
+
+        // Interface de succès
+        document.getElementById('inventory').innerHTML = `
+            <div class="col-span-full bg-white p-10 rounded-2xl shadow-xl text-center">
+                <div class="text-green-500 text-5xl mb-4">✅</div>
+                <h2 class="text-2xl font-bold">Demande envoyée !</h2>
+                <p class="text-gray-500 mb-6">Le contrat a été généré et envoyé par mail.</p>
+                <button onclick="window.location.reload()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg">Fermer</button>
+            </div>`;
+        panier = []; majPanier();
+
+    } catch (err) {
+        console.error("Erreur complète:", err);
+        alert("Erreur lors de la confirmation : " + err.message);
+        btn.disabled = false;
+        btn.innerText = "Confirmer la réservation";
+    }
+};
 
         fetchMateriels();
     </script>
