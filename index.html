@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <!-- Ajout EmailJS -->
+    <!-- EmailJS -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <script type="text/javascript">(function(){ emailjs.init("nOykns8pFjxSLoS1s"); })();</script>
 </head>
@@ -77,7 +77,7 @@
                     </div>
                 </div>
 
-                <button id="submitBtn" onclick="confirmerReservation()" class="w-full mt-6 bg-green-600 text-white py-4 rounded-xl font-bold hover:bg-green-700 shadow-lg transition transform active:scale-95">
+                <button id="submitBtn" class="w-full mt-6 bg-green-600 text-white py-4 rounded-xl font-bold hover:bg-green-700 shadow-lg transition transform active:scale-95">
                     Confirmer la réservation
                 </button>
             </div>
@@ -125,14 +125,19 @@
                         </div>
                         <div class="mt-4 flex gap-2">
                             <input type="number" id="qty-${item.id}" min="1" max="${item.stock_total}" value="1" class="w-12 border rounded text-center text-sm border-indigo-100">
-                            <button onclick="ajouterAuPanier(${item.id})" class="flex-1 bg-indigo-600 text-white text-xs py-2 rounded font-bold">Ajouter</button>
+                            <button data-id="${item.id}" class="btn-ajouter flex-1 bg-indigo-600 text-white text-xs py-2 rounded font-bold">Ajouter</button>
                         </div>
                     </div>
                 </div>
             `).join('');
+
+            // Delegation d'evenement pour les boutons ajouter
+            document.querySelectorAll('.btn-ajouter').forEach(btn => {
+                btn.onclick = () => ajouterAuPanier(parseInt(btn.dataset.id));
+            });
         }
 
-        window.ajouterAuPanier = (id) => {
+        function ajouterAuPanier(id) {
             const item = itemsData.find(i => i.id === id);
             const qtyInput = document.getElementById(`qty-${id}`);
             const qtySouhaitee = parseInt(qtyInput.value);
@@ -141,8 +146,7 @@
             const totalApresAjout = qtyDejaDansPanier + qtySouhaitee;
 
             if (totalApresAjout > item.stock_total) {
-                const restePossible = item.stock_total - qtyDejaDansPanier;
-                alert(restePossible > 0 ? `Limite atteinte ! Reste possible : ${restePossible}` : "Tout le stock est déjà dans votre panier.");
+                alert("Stock insuffisant.");
                 return;
             }
 
@@ -150,12 +154,7 @@
             else panier.push({ ...item, qty: qtySouhaitee });
             
             majPanier();
-        };
-
-        window.supprimerItem = (index) => {
-            panier.splice(index, 1);
-            majPanier();
-        };
+        }
 
         function majPanier() {
             const container = document.getElementById('panierList');
@@ -170,154 +169,137 @@
                         <span>${item.qty}x ${item.nom}</span>
                         <div class="flex items-center gap-2">
                             <span class="font-bold">${(item.qty * item.prix).toFixed(2)}€</span>
-                            <button onclick="supprimerItem(${index})" class="text-red-400"><i class="fas fa-times"></i></button>
+                            <button class="btn-suppr text-red-400" data-index="${index}"><i class="fas fa-times"></i></button>
                         </div>
                     </div>`;
                 }).join('');
+                
+                document.querySelectorAll('.btn-suppr').forEach(btn => {
+                    btn.onclick = () => {
+                        panier.splice(parseInt(btn.dataset.index), 1);
+                        majPanier();
+                    };
+                });
             }
             document.getElementById('totalPrix').innerText = totalP.toFixed(2) + " €";
             document.getElementById('totalCaution').innerText = totalC.toFixed(2) + " €";
         }
 
-      window.confirmerReservation = async () => {
-    const nom = document.getElementById('nom_loueur').value;
-    const email = document.getElementById('email_loueur').value;
-    const tel = document.getElementById('tel_loueur').value;
-    const debut = document.getElementById('date_debut').value;
-    const fin = document.getElementById('date_fin').value;
-    const totalP = document.getElementById('totalPrix').innerText;
-    const totalC = document.getElementById('totalCaution').innerText;
-    const btn = document.getElementById('submitBtn');
+        async function confirmerReservation() {
+            const nom = document.getElementById('nom_loueur').value;
+            const email = document.getElementById('email_loueur').value;
+            const tel = document.getElementById('tel_loueur').value;
+            const debut = document.getElementById('date_debut').value;
+            const fin = document.getElementById('date_fin').value;
+            const totalP = document.getElementById('totalPrix').innerText;
+            const totalC = document.getElementById('totalCaution').innerText;
+            const btn = document.getElementById('submitBtn');
 
-    if (!nom || !email || !debut || !fin || panier.length === 0) {
-        alert("Informations manquantes.");
-        return;
-    }
+            if (!nom || !email || !debut || !fin || panier.length === 0) {
+                alert("Informations manquantes.");
+                return;
+            }
 
-    btn.disabled = true;
-    btn.innerText = "Capture en cours...";
+            btn.disabled = true;
+            btn.innerText = "Génération du contrat...";
 
-    // 1. Création du gabarit (ton modèle)
-    const container = document.createElement('div');
-    container.id = 'pdf-render-zone';
-    // CRITIQUE : L'élément doit être dans le DOM et visible (même un peu) pour html2canvas
-    container.style.position = 'fixed';
-    container.style.left = '0';
-    container.style.top = '0';
-    container.style.width = '800px'; 
-    container.style.zIndex = '-1'; 
-    container.style.background = 'white';
-
-    container.innerHTML = `
-        <div style="padding: 40px; font-family: Arial, sans-serif; color: black;">
-            <h2 style="text-align: center; border-bottom: 2px solid black; padding-bottom: 10px;">CONTRAT DE LOCATION - ECOLE SAINTE ANNE CASSON</h2>
-            <div style="display: flex; justify-content: space-between; margin-top: 20px;">
-                <div>
-                    <strong>OGEC SERVICE LOCATION</strong><br>
-                    2 Rue du château, 44390 CASSON<br>
-                    location.ecolesteanne@gmail.com
+            // Zone de rendu PDF (invisible mais présente)
+            const container = document.createElement('div');
+            container.style.cssText = "position:fixed; left:-5000px; top:0; width:800px; background:white; padding:40px; color:black;";
+            container.innerHTML = `
+                <div style="font-family: Arial, sans-serif; border: 1px solid #000; padding: 20px;">
+                    <h1 style="text-align:center; text-decoration: underline;">CONTRAT DE LOCATION</h1>
+                    <p style="text-align:center;">École Sainte Anne - Casson</p>
+                    <div style="margin: 40px 0; display: flex; justify-content: space-between;">
+                        <div><strong>Loueur :</strong><br>${nom}<br>${tel}<br>${email}</div>
+                        <div style="text-align:right;"><strong>Date :</strong> ${new Date().toLocaleDateString('fr-FR')}</div>
+                    </div>
+                    <p><strong>Période :</strong> du ${debut} au ${fin}</p>
+                    <table style="width:100%; border-collapse:collapse; margin-top:20px;">
+                        <thead>
+                            <tr style="background:#eee; border:1px solid #000;">
+                                <th style="border:1px solid #000; padding:10px;">Article</th>
+                                <th style="border:1px solid #000; padding:10px;">Qté</th>
+                                <th style="border:1px solid #000; padding:10px;">Prix</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${panier.map(a => `
+                                <tr>
+                                    <td style="border:1px solid #000; padding:8px;">${a.nom}</td>
+                                    <td style="border:1px solid #000; padding:8px; text-align:center;">${a.qty}</td>
+                                    <td style="border:1px solid #000; padding:8px; text-align:right;">${(a.qty * a.prix).toFixed(2)} €</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    <div style="margin-top:20px; text-align:right; font-size: 1.2em;">
+                        <strong>TOTAL LOCATION : ${totalP}</strong><br>
+                        <strong>CAUTION : ${totalC}</strong>
+                    </div>
                 </div>
-                <div style="text-align: right; border: 1px solid #ccc; padding: 10px;">
-                    <strong>${nom}</strong><br>Tél: ${tel}<br>Mail: ${email}
-                </div>
-            </div>
-            <p style="margin-top: 20px; background: #eee; padding: 5px;"><strong>Dates :</strong> du ${debut} au ${fin}</p>
-            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-                <thead>
-                    <tr style="border-bottom: 2px solid black;">
-                        <th align="left">Articles</th><th align="center">Qté</th><th align="right">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${panier.map(a => `
-                        <tr style="border-bottom: 1px solid #ddd;">
-                            <td style="padding: 8px;">${a.nom}</td>
-                            <td align="center">${a.qty}</td>
-                            <td align="right">${(a.qty * a.prix).toFixed(2)} €</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-            <div style="margin-top: 20px; border: 2px solid black; padding: 10px; width: fit-content; margin-left: auto;">
-                <strong>Total : ${totalP}</strong><br><strong>Caution : ${totalC}</strong>
-            </div>
-            <div style="margin-top: 30px; font-size: 10px;">
-                <p>• Le matériel doit être restitué propre et en bon état.</p>
-                <p>• Le locataire est responsable du matériel pendant la location.</p>
-            </div>
-        </div>
-    `;
+            `;
+            document.body.appendChild(container);
 
-    document.body.appendChild(container);
+            // Options PDF pour éviter le blanc
+            const opt = {
+                margin: 10,
+                filename: `Contrat_${nom}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
 
-    // 2. LA MAGIE : On attend que le navigateur dessine réellement l'élément
-    await new Promise(resolve => {
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                setTimeout(resolve, 500); // Pause de sécurité supplémentaire
-            });
-        });
-    });
+            try {
+                // Attente rendu
+                await new Promise(r => setTimeout(r, 1000));
+                
+                // On génère et on sauvegarde
+                const worker = html2pdf().set(opt).from(container);
+                await worker.save();
+                
+                // On récupère le blob pour l'envoi
+                const pdfBlob = await worker.output('blob');
+                document.body.removeChild(container);
 
-    const opt = {
-        margin: 0,
-        filename: `Contrat_${nom}.pdf`,
-        image: { type: 'jpeg', quality: 1 },
-        html2canvas: { 
-            scale: 2, 
-            useCORS: true, 
-            logging: false,
-            backgroundColor: '#ffffff' // Force le fond blanc
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
+                btn.innerText = "Envoi aux serveurs...";
 
-    try {
-        const worker = html2pdf().set(opt).from(container);
+                // 1. Database
+                const { error: dbErr } = await supabase.from('reservations').insert([{
+                    nom_loueur: nom, email: email, telephone: tel,
+                    date_debut: debut, date_fin: fin, articles: panier,
+                    total_prix: parseFloat(totalP), total_caution: parseFloat(totalC)
+                }]);
+                if (dbErr) throw dbErr;
+
+                // 2. Storage
+                const fileName = `${Date.now()}_contrat.pdf`;
+                const { error: stErr } = await supabase.storage.from('contrats').upload(fileName, pdfBlob);
+                if (stErr) throw stErr;
+
+                // 3. Email
+                const { data: { publicUrl } } = supabase.storage.from('contrats').getPublicUrl(fileName);
+                await emailjs.send('service_63g35od', 'template_gb5d2wt', {
+                    nom_loueur: nom,
+                    email_destinataire: email,
+                    lien_pdf: publicUrl
+                });
+
+                alert("Réservation réussie !");
+                window.location.reload();
+
+            } catch (err) {
+                console.error(err);
+                alert("Erreur : " + err.message);
+                btn.disabled = false;
+                btn.innerText = "Confirmer la réservation";
+            }
+        }
+
+        // Liaison finale du bouton
+        document.getElementById('submitBtn').addEventListener('click', confirmerReservation);
         
-        // Exécution de la sauvegarde
-        await worker.save();
-        
-        // Récupération du Blob pour Supabase
-        const pdfBlob = await worker.output('blob');
-
-        // Nettoyage immédiat
-        document.body.removeChild(container);
-
-        // 3. Suite Supabase
-        btn.innerText = "Envoi serveur...";
-        
-        const { error: dbError } = await supabase.from('reservations').insert([{
-            nom_loueur: nom, email: email, telephone: tel,
-            date_debut: debut, date_fin: fin, articles: panier,
-            total_prix: parseFloat(totalP), total_caution: parseFloat(totalC)
-        }]);
-        if (dbError) throw dbError;
-
-        const cleanNom = nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '_');
-        const fileName = `${Date.now()}_${cleanNom}.pdf`;
-
-        const { error: storageError } = await supabase.storage
-            .from('contrats')
-            .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
-        
-        if (storageError) throw storageError;
-
-        const { data: { publicUrl } } = supabase.storage.from('contrats').getPublicUrl(fileName);
-
-        await emailjs.send('service_63g35od', 'template_gb5d2wt', {
-            nom_loueur: nom, email_destinataire: email, lien_pdf: publicUrl
-        });
-
-        alert("Succès ! Contrat envoyé.");
-        window.location.reload();
-
-    } catch (err) {
-        console.error(err);
-        alert("Erreur: " + err.message);
-        btn.disabled = false;
-    }
-};
+        // Init
         fetchMateriels();
     </script>
 </body>
