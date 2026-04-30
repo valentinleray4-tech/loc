@@ -190,138 +190,124 @@
     const btn = document.getElementById('submitBtn');
 
     if (!nom || !email || !debut || !fin || panier.length === 0) {
-        alert("Veuillez remplir toutes les informations et choisir du matériel.");
+        alert("Veuillez remplir toutes les informations.");
         return;
     }
 
     btn.disabled = true;
-    btn.innerText = "Génération sécurisée...";
+    btn.innerText = "Génération en cours...";
 
-    try {
-        // 1. Création d'un conteneur de rendu "en dur"
-        // On utilise des styles inline très simples pour éviter les échecs de rendu CSS
-        const element = document.createElement('div');
-        element.style.padding = "40px";
-        element.style.width = "750px"; // Largeur fixe pour le canvas
-        element.style.backgroundColor = "#ffffff";
-        element.style.color = "#000000";
-        
-        element.innerHTML = `
-            <div style="font-family: Arial, sans-serif; border: 1px solid #eee; padding: 20px;">
-                <h1 style="text-align: center; text-decoration: underline; margin-bottom: 30px;">
-                    CONTRAT DE LOCATION - ECOLE STE ANNE
-                </h1>
-
-                <div style="display: flex; justify-content: space-between; margin-bottom: 40px;">
-                    <div style="width: 45%;">
-                        <strong style="font-size: 14px;">OGEC SERVICE LOCATION</strong><br>
-                        2 Rue du château<br>
-                        44390 CASSON
-                    </div>
-                    <div style="width: 45%; border: 1px solid #000; padding: 10px;">
-                        <strong>LOCATAIRE :</strong><br>
-                        ${nom}<br>
-                        Tél : ${tel}<br>
-                        Mail : ${email}
-                    </div>
+    // 1. Préparation de l'élément HTML (Ton modèle exact)
+    const element = document.createElement('div');
+    element.style.padding = "30px";
+    element.style.width = "750px"; 
+    element.style.backgroundColor = "white";
+    element.innerHTML = `
+        <div style="font-family: Arial, sans-serif; color: #000; line-height: 1.4;">
+            <h2 style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px;">
+                CONTRAT DE LOCATION - ECOLE SAINTE ANNE CASSON
+            </h2>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
+                <div>
+                    <h3 style="margin: 0;">OGEC SERVICE LOCATION</h3>
+                    <p style="margin: 0;">ECOLE SAINTE ANNE<br>2 Rue du château<br>44390 CASSON<br>location.ecolesteanne@gmail.com</p>
                 </div>
-
-                <div style="background-color: #f0f0f0; padding: 10px; margin-bottom: 20px; font-weight: bold;">
-                    Dates de location : du ${debut} au ${fin}
+                <div style="text-align: right; border: 1px solid #ccc; padding: 10px; border-radius: 5px; min-width: 200px;">
+                    <p style="margin: 0;"><strong>${nom}</strong></p>
+                    <p style="margin: 0;">Tél : ${tel}</p>
+                    <p style="margin: 0;">Mail : ${email}</p>
                 </div>
-
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+            </div>
+            <div style="margin-bottom: 20px;">
+                <h4 style="background: #e5e7eb; padding: 5px; margin-bottom: 5px;">1- Date de Location:</h4>
+                <p style="margin-left: 10px;"><strong>Date de départ :</strong> ${debut} &nbsp;&nbsp;&nbsp; <strong>Date de retour :</strong> ${fin}</p>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <h4 style="background: #e5e7eb; padding: 5px; margin-bottom: 10px;">2- Matériels loués :</h4>
+                <table style="width: 100%; border-collapse: collapse;">
                     <thead>
-                        <tr style="border-bottom: 2px solid #000; background-color: #eee;">
-                            <th style="text-align: left; padding: 8px;">Désignation</th>
-                            <th style="text-align: center; padding: 8px;">Qté</th>
-                            <th style="text-align: right; padding: 8px;">Total</th>
+                        <tr style="border-bottom: 2px solid #000;">
+                            <th style="padding: 8px; text-align: left;">Articles</th>
+                            <th style="padding: 8px; text-align: center;">Quantités</th>
+                            <th style="padding: 8px; text-align: right;">Prix/unités</th>
+                            <th style="padding: 8px; text-align: right;">Caution/unités</th>
+                            <th style="padding: 8px; text-align: right;">Prix Total</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${panier.map(a => `
-                            <tr style="border-bottom: 1px solid #ddd;">
+                            <tr style="border-bottom: 1px solid #eee;">
                                 <td style="padding: 8px;">${a.nom}</td>
                                 <td style="padding: 8px; text-align: center;">${a.qty}</td>
+                                <td style="padding: 8px; text-align: right;">${a.prix.toFixed(2)} €</td>
+                                <td style="padding: 8px; text-align: right;">${(a.caution_unitaire || 10).toFixed(2)} €</td>
                                 <td style="padding: 8px; text-align: right;">${(a.qty * a.prix).toFixed(2)} €</td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
-
-                <div style="margin-left: auto; width: 300px; border: 2px solid #000; padding: 15px; font-size: 16px;">
-                    <strong>TOTAL À RÉGLER : ${totalP}</strong><br>
-                    <strong>CAUTION PRÉVUE : ${totalC}</strong>
-                </div>
-
-                <div style="margin-top: 50px; font-size: 11px; line-height: 1.4;">
-                    <p><strong>Conditions :</strong> Le matériel est loué propre et en bon état.</p>
-                    <p>La caution sera restituée après vérification, sauf en cas de casse ou perte.</p>
-                    <p><em>Signature obligatoire précédée de la mention "Lu et approuvé" :</em></p>
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; margin-top: 60px;">
-                    <div style="width: 40%; border-top: 1px solid #000; padding-top: 5px;">Signature École</div>
-                    <div style="width: 40%; border-top: 1px solid #000; padding-top: 5px;">Signature Loueur</div>
-                </div>
             </div>
-        `;
+            <div style="margin-bottom: 20px; border: 1px solid #000; padding: 10px;">
+                <h4 style="margin: 0 0 5px 0;">3- Montant à régler/Caution:</h4>
+                <p style="margin: 3px 0;"><strong>Montant Total à régler :</strong> ${totalP}</p>
+                <p style="margin: 3px 0;"><strong>Montant chèque de caution :</strong> ${totalC}</p>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <h4 style="background: #e5e7eb; padding: 5px; margin-bottom: 5px;">4- Etat du matériel:</h4>
+                <div style="border: 1px solid #ccc; height: 40px; padding: 5px; color: #666;">Remarques/observations :</div>
+            </div>
+            <div style="margin-bottom: 20px; font-size: 10px;">
+                <h4 style="background: #e5e7eb; padding: 5px; margin-bottom: 5px; font-size: 11px;">5- Conditions:</h4>
+                <p style="margin: 0;">• Une caution sera demandée lors de la remise du matériel.</p>
+                <p style="margin: 0;">• La caution ne sera pas encaissée sauf en cas de détérioration, perte ou non-restitution du matériel.</p>
+                <p style="margin: 0;">• Le locataire est responsable du matériel pendant toute la durée de la location.</p>
+                <p style="margin: 10px 0; font-weight: bold; text-align: center;">CE CONTRAT NE FAIT FOI QU'APRÈS CONFIRMATION PAR L'OGEC</p>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 40px;">
+                <div style="width: 40%; border-top: 1px solid #000; padding-top: 5px;">Signature OGEC :</div>
+                <div style="width: 40%; border-top: 1px solid #000; padding-top: 5px;">Signature loueur :</div>
+            </div>
+        </div>
+    `;
 
-        // 2. Injection invisible mais RÉELLE dans le DOM
-        // Sans ça, html2canvas ne peut pas calculer les dimensions correctement
-        element.style.position = "fixed";
-        element.style.top = "0";
-        element.style.left = "-10000px";
-        document.body.appendChild(element);
+    // 2. Configuration du Worker
+    const opt = {
+        margin: 10,
+        filename: `Contrat_${nom.replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, logging: false, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
 
-        // Paramètres de rendu ultra-stables
-        const options = {
-            margin: 0,
-            filename: `Contrat_${nom.replace(/\s+/g, '_')}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { 
-                scale: 2, 
-                useCORS: true, 
-                letterRendering: true,
-                scrollY: 0,
-                scrollX: 0,
-                windowWidth: 800 // On force la largeur de la "fenêtre" de capture
-            },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
+    try {
+        // --- LA SÉQUENCE CRITIQUE ---
+        // On crée le worker
+        const worker = html2pdf().set(opt).from(element);
 
-        // 3. Pause forcée pour laisser le navigateur dessiner
-        await new Promise(resolve => setTimeout(resolve, 800));
-
-        // 4. Capture et sauvegarde
-        const worker = html2pdf().set(options).from(element);
-        
-        // Téléchargement pour l'utilisateur
+        // A. On sauvegarde d'abord (téléchargement client)
         await worker.save();
 
-        // On transforme en BLOB pour Supabase
+        // B. On récupère le BLOB à partir du même worker SANS relancer le rendu
         const pdfBlob = await worker.output('blob');
 
-        // Nettoyage immédiat du DOM
-        document.body.removeChild(element);
-
-        // 5. Suite du processus (Supabase / Email)
-        const { error: insertError } = await supabase.from('reservations').insert([{
+        // 3. Envoi vers Supabase Database
+        const { error: dbError } = await supabase.from('reservations').insert([{
             nom_loueur: nom, email: email, telephone: tel,
             date_debut: debut, date_fin: fin, articles: panier,
             total_prix: parseFloat(totalP), total_caution: parseFloat(totalC)
         }]);
-        if (insertError) throw insertError;
+        if (dbError) throw dbError;
 
+        // 4. Upload vers Supabase Storage
         const cleanNom = nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '_');
         const fileName = `${Date.now()}_${cleanNom}.pdf`;
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: storageError } = await supabase.storage
             .from('contrats')
-            .upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
-        
-        if (uploadError) throw uploadError;
+            .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
+        if (storageError) throw storageError;
 
+        // 5. Récupération URL et Envoi EmailJS
         const { data: { publicUrl } } = supabase.storage.from('contrats').getPublicUrl(fileName);
 
         await emailjs.send('service_63g35od', 'template_gb5d2wt', {
@@ -330,21 +316,21 @@
             lien_pdf: publicUrl
         });
 
-        // Succès
+        // 6. Succès
         document.getElementById('inventory').innerHTML = `
             <div class="col-span-full bg-white p-10 rounded-2xl shadow-xl text-center">
                 <div class="text-green-500 text-5xl mb-4">✅</div>
-                <h2 class="text-2xl font-bold">Demande envoyée !</h2>
-                <p class="text-gray-500 mb-6">Le contrat PDF a été généré. Vérifiez vos emails.</p>
+                <h2 class="text-2xl font-bold">Réservation validée !</h2>
+                <p class="text-gray-500 mb-6">Le contrat a été téléchargé et envoyé par email.</p>
                 <button onclick="window.location.reload()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg">Fermer</button>
             </div>`;
         panier = []; majPanier();
 
     } catch (err) {
-        console.error("Détails de l'erreur :", err);
-        alert("Erreur critique : " + err.message);
+        console.error(err);
+        alert("Erreur lors de la procédure : " + err.message);
         btn.disabled = false;
-        btn.innerText = "Réessayer la confirmation";
+        btn.innerText = "Confirmer la réservation";
     }
 };
         fetchMateriels();
