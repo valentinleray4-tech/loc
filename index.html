@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loc'APEL école St Anne-Casson</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script type="text/javascript">(function(){ emailjs.init("nOykns8pFjxSLoS1s"); })();</script>
+</head>
+<body class="bg-gray-100">
+
+    <header class="bg-indigo-700 text-white shadow-md p-6">
+        <div class="container mx-auto">
+            <h1 class="text-2xl font-bold text-center">Loc'APEL école St Anne-Casson</h1>
+        </div>
+    </header>
+
+    <main class="container mx-auto py-8 px-4 grid lg:grid-cols-3 gap-8">
+        <!-- Catalogue avec Stocks -->
+        <div class="lg:col-span-2">
+            <div class="bg-white p-6 rounded-xl shadow-sm min-h-[400px]">
+                <h2 class="text-xl font-bold mb-6 border-b pb-2 text-gray-800 italic">Matériel disponible</h2>
+                <div class="grid md:grid-cols-2 gap-6" id="inventory"></div>
+            </div>
+        </div>
+
+        <!-- Panier -->
+        <aside>
+            <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-indigo-500 sticky top-6">
+                <h2 class="text-xl font-bold mb-4 text-indigo-600"><i class="fas fa-shopping-cart mr-2"></i>Votre Panier</h2>
+                <div id="panierList" class="space-y-3 mb-6 border-b pb-4 text-sm text-gray-400 italic">Vide</div>
+                
+                <div class="bg-indigo-50 p-3 rounded-lg text-sm mb-6">
+                    <div class="flex justify-between font-bold text-gray-700"><span>Total Location :</span> <span id="totalPrix">0.00 €</span></div>
+                    <div class="flex justify-between text-orange-700 font-bold"><span>Caution :</span> <span id="totalCaution">0.00 €</span></div>
+                </div>
+
+                <div class="space-y-3 p-4 bg-gray-50 rounded-lg border">
+                    <input type="text" id="nom_loueur" placeholder="Nom et Prénom" class="w-full p-2 border rounded text-sm">
+                    <input type="email" id="email_loueur" placeholder="Email" class="w-full p-2 border rounded text-sm">
+                    <input type="tel" id="tel_loueur" placeholder="Téléphone" class="w-full p-2 border rounded text-sm">
+                    <div class="grid grid-cols-2 gap-2 mt-2">
+                        <input type="date" id="date_debut" class="w-full p-2 border rounded text-sm">
+                        <input type="date" id="date_fin" class="w-full p-2 border rounded text-sm">
+                    </div>
+                </div>
+
+                <button onclick="confirmerReservation()" id="btnSubmit" class="w-full mt-6 bg-green-600 text-white py-4 rounded-xl font-bold hover:bg-green-700 transition shadow-lg">
+                    Confirmer & Télécharger le contrat
+                </button>
+            </div>
+        </aside>
+    </main>
+
+    <!-- ZONE DU CONTRAT (STRICTEMENT NOIR ET BLANC - SOURCE 4) -->
+    <div class="container mx-auto my-10 p-5 bg-white border max-w-4xl overflow-x-auto shadow-inner">
+        <h3 class="text-center text-gray-400 text-xs mb-4">Aperçu du document officiel (OGEC)</h3>
+        <div id="pdf-render-zone" style="width: 750px; margin: 0 auto; background: white; color: black !important; font-family: Arial, sans-serif; padding: 40px; border: 1px solid #eee;">
+             <!-- Rempli par JS -->
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+        const supabase = createClient('https://uofkzlgqryxhjaovidqf.supabase.co', 'sb_publishable_3yWGD_MoqP-6jHeHbbIM5w_kphGAJ2F');
+
+        let panier = [];
+        let itemsData = [];
+
+        async function fetchMateriels() {
+            const { data } = await supabase.from('materiels').select('*');
+            itemsData = data || [];
+            renderInventory();
+            majContratVisuel();
+        }
+
+        function renderInventory() {
+            document.getElementById('inventory').innerHTML = itemsData.map(item => {
+                const qteDansPanier = panier.find(p => p.id === item.id)?.qty || 0;
+                const stockDisponible = (item.stock || 0) - qteDansPanier;
+                const isOut = stockDisponible <= 0;
+
+                return `
+                <div class="border rounded-xl bg-white shadow-sm overflow-hidden flex flex-col ${isOut ? 'opacity-60 font-grayscale' : ''}">
+                    <img src="${item.image_url}" class="h-40 w-full object-cover bg-gray-100">
+                    <div class="p-4 flex flex-col flex-grow">
+                        <div class="flex justify-between font-bold text-gray-800">
+                            <span>${item.nom}</span>
+                            <span class="text-indigo-600">${item.prix}€</span>
+                        </div>
+                        <p class="text-xs ${isOut ? 'text-red-500 font-bold' : 'text-gray-500'} mt-1">
+                            Stock : ${isOut ? 'Épuisé' : stockDisponible}
+                        </p>
+                        <div class="flex gap-2 mt-4">
+                            <input type="number" id="qty-${item.id}" value="1" min="1" max="${stockDisponible}" 
+                                class="w-12 border rounded text-center font-bold" ${isOut ? 'disabled' : ''}>
+                            <button onclick="ajouterAuPanier(${item.id})" 
+                                class="flex-1 ${isOut ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white py-2 rounded-lg font-bold text-sm transition"
+                                ${isOut ? 'disabled' : ''}>
+                                ${isOut ? 'Indisponible' : 'Ajouter'}
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        window.ajouterAuPanier = (id) => {
+            const item = itemsData.find(i => i.id === id);
+            const inputQty = document.getElementById(`qty-${id}`);
+            const qtyToAdd = parseInt(inputQty.value);
+            
+            const qteActuellePanier = panier.find(p => p.id === id)?.qty || 0;
+            if (qteActuellePanier + qtyToAdd > item.stock) {
+                alert("Action impossible : stock insuffisant.");
+                return;
+            }
+
+            const index = panier.findIndex(p => p.id === id);
+            if (index > -1) panier[index].qty += qtyToAdd;
+            else panier.push({ ...item, qty: qtyToAdd });
+            
+            renderInventory(); // Mise à jour des stocks affichés
+            majContratVisuel();
+        }
+
+        function majContratVisuel() {
+            let tp = 0; let tc = 0;
+            const info = {
+                nom: document.getElementById('nom_loueur').value || "________________",
+                mail: document.getElementById('email_loueur').value || "________________",
+                tel: document.getElementById('tel_loueur').value || "________________",
+                dep: document.getElementById('date_debut').value || "____/____/____",
+                ret: document.getElementById('date_fin').value || "____/____/____"
+            };
+
+            // Panier UI
+            const list = document.getElementById('panierList');
+            list.innerHTML = panier.length === 0 ? "Vide" : panier.map(item => {
+                tp += (item.qty * item.prix);
+                tc += (item.qty * (item.caution_unitaire || 0));
+                return `<div class="flex justify-between text-gray-700 font-medium"><span>${item.qty}x ${item.nom}</span> <button onclick="retirer(${item.id})" class="text-red-400 text-xs">Retirer</button></div>`;
+            }).join('');
+            document.getElementById('totalPrix').innerText = tp.toFixed(2) + " €";
+            document.getElementById('totalCaution').innerText = tc.toFixed(2) + " €";
+
+            // Rendu du PDF (Strictement conforme source 4)
+            document.getElementById('pdf-render-zone').innerHTML = `
+                <div style="text-align: center; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h2 style="margin:0; font-size: 20px;">CONTRAT DE LOCATION - ECOLE SAINTE ANNE CASSON</h2>
+                    <p style="font-size: 11px; margin: 4px 0;">OGEC SERVICE LOCATION | 2 Rue du château | 44390 CASSON[cite: 4]</p>
+                    <p style="font-size: 11px; margin: 4px 0;">location.ecolesteanne@gmail.com[cite: 4]</p>
+                </div>
+                <p style="font-size: 13px;"><strong>Nom Prénom (loueur) :</strong> ${info.nom}</p>
+                <p style="font-size: 13px;"><strong>Téléphone :</strong> ${info.tel} | <strong>Mail :</strong> ${info.mail}[cite: 4]</p>
+                <div style="margin: 15px 0; border: 1px solid black; padding: 10px; font-size: 13px;">
+                    <strong>1- Date de Location:</strong><br>
+                    Date de départ : ${info.dep} | Date de retour : ${info.ret}[cite: 4]
+                </div>
+                <strong style="font-size: 13px;">2- Matériels loués :</strong>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px;">
+                    <thead>
+                        <tr style="background: #f5f5f5;">
+                            <th style="border: 1px solid black; padding: 6px; text-align: left;">Articles</th>
+                            <th style="border: 1px solid black; padding: 6px;">Quantités</th>
+                            <th style="border: 1px solid black; padding: 6px;">Prix Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${panier.map(a => `<tr><td style="border: 1px solid black; padding: 6px;">${a.nom}</td><td style="border: 1px solid black; padding: 6px; text-align:center;">${a.qty}</td><td style="border: 1px solid black; padding: 6px; text-align:center;">${(a.qty * a.prix).toFixed(2)} €</td></tr>`).join('')}
+                    </tbody>
+                </table>
+                <div style="margin-top: 15px; font-size: 13px;">
+                    <strong>3- Montant à régler/Caution:</strong><br>
+                    Total à régler : <strong>${tp.toFixed(2)} €</strong> | Caution : <strong>${tc.toFixed(2)} €</strong>[cite: 4]
+                </div>
+                <div style="margin-top: 20px; font-size: 10px;">
+                    <strong>5- Conditions:</strong>[cite: 4]
+                    <p style="margin:2px;">• La caution ne sera pas encaissée sauf en cas de détérioration.[cite: 4]</p>
+                    <p style="margin:2px;">• Le matériel doit être restitué complet et propre.[cite: 4]</p>
+                    <p style="text-align: center; font-weight: bold; margin-top: 10px; border: 1px solid black; padding: 5px;">
+                        CE CONTRAT NE FAIT FOI QU'APRÈS CONFIRMATION PAR L'OGEC[cite: 4]
+                    </p>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 40px; font-size: 12px;">
+                    <div style="border-top: 1px solid black; width: 180px; text-align: center; padding-top: 5px;">Signature OGEC</div>
+                    <div style="border-top: 1px solid black; width: 180px; text-align: center; padding-top: 5px;">Signature loueur</div>
+                </div>
+            `;
+        }
+
+        window.retirer = (id) => {
+            panier = panier.filter(p => p.id !== id);
+            renderInventory();
+            majContratVisuel();
+        }
+
+        ['nom_loueur', 'email_loueur', 'tel_loueur', 'date_debut', 'date_fin'].forEach(id => {
+            document.getElementById(id).addEventListener('input', majContratVisuel);
+        });
+
+        window.confirmerReservation = async () => {
+            const btn = document.getElementById('btnSubmit');
+            const nom = document.getElementById('nom_loueur').value;
+            if (!nom || panier.length === 0) return alert("Veuillez remplir votre nom et choisir du matériel.");
+
+            btn.disabled = true;
+            btn.innerText = "Traitement...";
+
+            const element = document.getElementById('pdf-render-zone');
+            const opt = { 
+                margin: 10, filename: `Contrat_${nom}.pdf`, 
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            try {
+                await html2pdf().set(opt).from(element).save();
+                const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+                const path = `contrats/${Date.now()}.pdf`;
+                await supabase.storage.from('contrats').upload(path, pdfBlob, {contentType:'application/pdf'});
+                const { data: { publicUrl } } = supabase.storage.from('contrats').getPublicUrl(path);
+
+                await emailjs.send('service_63g35od', 'template_gb5d2wt', {
+                    nom_loueur: nom, email_destinataire: document.getElementById('email_loueur').value, lien_pdf: publicUrl
+                });
+
+                alert("Réservation réussie ! Votre contrat a été téléchargé.");
+                window.location.reload();
+            } catch (e) { console.error(e); btn.disabled = false; }
+        };
+
+        fetchMateriels();
+    </script>
+</body>
+</html>
