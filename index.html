@@ -19,15 +19,17 @@
     </header>
 
     <main class="container mx-auto py-8 px-4 grid lg:grid-cols-3 gap-8">
+        <!-- Catalogue -->
         <div class="lg:col-span-2">
             <div class="bg-white p-6 rounded-xl shadow-sm min-h-[400px]">
                 <h2 class="text-xl font-bold mb-6 border-b pb-2 text-gray-800 italic">Matériel disponible</h2>
                 <div class="grid md:grid-cols-2 gap-6" id="inventory">
-                    <p class="text-center text-gray-500 py-10 col-span-2">Chargement du matériel...</p>
+                    <p class="text-center text-gray-500 py-10 col-span-2">Connexion à la base de données...</p>
                 </div>
             </div>
         </div>
 
+        <!-- Panier -->
         <aside>
             <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-indigo-500 sticky top-6">
                 <h2 class="text-xl font-bold mb-4 text-indigo-600"><i class="fas fa-shopping-cart mr-2"></i>Votre Panier</h2>
@@ -48,16 +50,18 @@
                     </div>
                 </div>
 
-                <button onclick="confirmerReservation()" id="btnSubmit" class="w-full mt-6 bg-green-600 text-white py-4 rounded-xl font-bold hover:bg-green-700 transition shadow-lg">
+                <button onclick="window.confirmerReservation()" id="btnSubmit" class="w-full mt-6 bg-green-600 text-white py-4 rounded-xl font-bold hover:bg-green-700 transition shadow-lg">
                     Confirmer & Télécharger le contrat
                 </button>
             </div>
         </aside>
     </main>
 
+    <!-- Zone du Contrat caché (pour le PDF) -->
     <div class="container mx-auto my-10 p-5 bg-white border max-w-4xl overflow-x-auto shadow-inner">
         <h3 class="text-center text-gray-400 text-xs mb-4">Aperçu du document officiel (OGEC)</h3>
         <div id="pdf-render-zone" style="width: 750px; margin: 0 auto; background: white; color: black !important; font-family: Arial, sans-serif; padding: 40px; border: 1px solid #eee;">
+             <!-- Rempli par JS -->
         </div>
     </div>
 
@@ -68,14 +72,14 @@
         let panier = [];
         let itemsData = [];
 
-        // 1. Rendre les fonctions disponibles globalement (important pour les boutons onclick)
+        // Rendre les fonctions accessibles globalement
         window.ajouterAuPanier = (id) => {
             const item = itemsData.find(i => i.id === id);
             const inputQty = document.getElementById(`qty-${id}`);
-            const qtyToAdd = parseInt(inputQty.value);
+            const qtyToAdd = parseInt(inputQty.value) || 1;
+            
             const qteActuellePanier = panier.find(p => p.id === id)?.qty || 0;
-
-            if (qteActuellePanier + qtyToAdd > item.stock) {
+            if (qteActuellePanier + qtyToAdd > (item.stock || 0)) {
                 alert("Action impossible : stock insuffisant.");
                 return;
             }
@@ -94,64 +98,49 @@
             majContratVisuel();
         };
 
-        window.confirmerReservation = async () => {
-            const btn = document.getElementById('btnSubmit');
-            const nom = document.getElementById('nom_loueur').value;
-            if (!nom || panier.length === 0) return alert("Veuillez remplir votre nom et choisir du matériel.");
-
-            btn.disabled = true;
-            btn.innerText = "Traitement...";
-
-            const element = document.getElementById('pdf-render-zone');
-            const opt = { 
-                margin: 10, filename: `Contrat_${nom}.pdf`, 
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-
-            try {
-                await html2pdf().set(opt).from(element).save();
-                const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
-                const path = `contrats/${Date.now()}.pdf`;
-                await supabase.storage.from('contrats').upload(path, pdfBlob, {contentType:'application/pdf'});
-                const { data: { publicUrl } } = supabase.storage.from('contrats').getPublicUrl(path);
-
-                await emailjs.send('service_63g35od', 'template_gb5d2wt', {
-                    nom_loueur: nom, email_destinataire: document.getElementById('email_loueur').value, lien_pdf: publicUrl
-                });
-
-                alert("Réservation réussie !");
-                window.location.reload();
-            } catch (e) { console.error(e); btn.disabled = false; }
-        };
-
-        // 2. Fonctions de rendu
-        function renderInventory() {
-            if (itemsData.length === 0) {
-                document.getElementById('inventory').innerHTML = "<p class='col-span-2 text-red-500'>Aucune donnée trouvée. Vérifiez votre table Supabase.</p>";
+        async function fetchMateriels() {
+            console.log("Tentative de connexion à Supabase...");
+            const { data, error } = await supabase.from('materiels').select('*');
+            if (error) {
+                console.error("Erreur Supabase :", error);
+                document.getElementById('inventory').innerHTML = "<p class='text-red-500'>Erreur de chargement des données.</p>";
                 return;
             }
-            document.getElementById('inventory').innerHTML = itemsData.map(item => {
+            console.log("Données reçues :", data);
+            itemsData = data || [];
+            renderInventory();
+            majContratVisuel();
+        }
+
+        function renderInventory() {
+            const container = document.getElementById('inventory');
+            if (itemsData.length === 0) {
+                container.innerHTML = "<p class='col-span-2 text-center py-10'>Aucun matériel disponible en base.</p>";
+                return;
+            }
+
+            container.innerHTML = itemsData.map(item => {
                 const qteDansPanier = panier.find(p => p.id === item.id)?.qty || 0;
                 const stockDisponible = (item.stock || 0) - qteDansPanier;
                 const isOut = stockDisponible <= 0;
+                // Sécurité image null
+                const imgUrl = item.image_url || 'https://via.placeholder.com/150?text=Pas+d+image';
 
                 return `
                 <div class="border rounded-xl bg-white shadow-sm overflow-hidden flex flex-col ${isOut ? 'opacity-60' : ''}">
-                    <img src="${item.image_url}" class="h-40 w-full object-cover bg-gray-100">
+                    <img src="${imgUrl}" class="h-40 w-full object-cover bg-gray-100">
                     <div class="p-4 flex flex-col flex-grow">
                         <div class="flex justify-between font-bold text-gray-800">
                             <span>${item.nom}</span>
                             <span class="text-indigo-600">${item.prix}€</span>
                         </div>
                         <p class="text-xs ${isOut ? 'text-red-500 font-bold' : 'text-gray-500'} mt-1">
-                            Stock disponible : ${stockDisponible}
+                            Stock disponible : ${isOut ? '0 (Épuisé)' : stockDisponible}
                         </p>
                         <div class="flex gap-2 mt-4">
                             <input type="number" id="qty-${item.id}" value="1" min="1" max="${stockDisponible}" 
                                 class="w-12 border rounded text-center font-bold" ${isOut ? 'disabled' : ''}>
-                            <button onclick="ajouterAuPanier(${item.id})" 
+                            <button onclick="window.ajouterAuPanier(${item.id})" 
                                 class="flex-1 ${isOut ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white py-2 rounded-lg font-bold text-sm transition"
                                 ${isOut ? 'disabled' : ''}>
                                 ${isOut ? 'Indisponible' : 'Ajouter'}
@@ -176,12 +165,13 @@
             list.innerHTML = panier.length === 0 ? "Vide" : panier.map(item => {
                 tp += (item.qty * item.prix);
                 tc += (item.qty * (item.caution_unitaire || 0));
-                return `<div class="flex justify-between text-gray-700 font-medium"><span>${item.qty}x ${item.nom}</span> <button onclick="retirer(${item.id})" class="text-red-400 text-xs">Retirer</button></div>`;
+                return `<div class="flex justify-between text-gray-700 font-medium"><span>${item.qty}x ${item.nom}</span> <button onclick="window.retirer(${item.id})" class="text-red-400 text-xs">Retirer</button></div>`;
             }).join('');
             
             document.getElementById('totalPrix').innerText = tp.toFixed(2) + " €";
             document.getElementById('totalCaution').innerText = tc.toFixed(2) + " €";
 
+            // Rendu Contrat Noir et Blanc
             document.getElementById('pdf-render-zone').innerHTML = `
                 <div style="text-align: center; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 20px;">
                     <h2 style="margin:0; font-size: 20px;">CONTRAT DE LOCATION - ECOLE SAINTE ANNE CASSON</h2>
@@ -191,48 +181,75 @@
                 <p style="font-size: 13px;"><strong>Nom Prénom (loueur) :</strong> ${info.nom}</p>
                 <p style="font-size: 13px;"><strong>Tél :</strong> ${info.tel} | <strong>Mail :</strong> ${info.mail}</p>
                 <div style="margin: 15px 0; border: 1px solid black; padding: 10px; font-size: 13px;">
-                    <strong>1- Dates :</strong> Du ${info.dep} au ${info.ret}
+                    <strong>1- Dates de Location :</strong><br>
+                    Du : ${info.dep} au : ${info.ret}
                 </div>
                 <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px;">
                     <tr style="background: #f5f5f5;">
                         <th style="border: 1px solid black; padding: 6px;">Articles</th>
-                        <th style="border: 1px solid black; padding: 6px;">Qte</th>
+                        <th style="border: 1px solid black; padding: 6px;">Quantité</th>
                         <th style="border: 1px solid black; padding: 6px;">Total</th>
                     </tr>
                     ${panier.map(a => `<tr><td style="border: 1px solid black; padding: 6px;">${a.nom}</td><td style="border: 1px solid black; padding: 6px; text-align:center;">${a.qty}</td><td style="border: 1px solid black; padding: 6px; text-align:center;">${(a.qty * a.prix).toFixed(2)} €</td></tr>`).join('')}
                 </table>
                 <div style="margin-top: 15px; font-size: 13px;">
-                    <strong>Total : ${tp.toFixed(2)} €</strong> | <strong>Caution : ${tc.toFixed(2)} €</strong>
+                    <strong>Total à régler : ${tp.toFixed(2)} €</strong> | <strong>Caution : ${tc.toFixed(2)} €</strong>
+                </div>
+                <div style="margin-top: 20px; font-size: 10px; border: 1px solid black; padding: 5px;">
+                    <strong>Conditions :</strong> Le matériel doit être rendu propre. La caution n'est pas encaissée sauf dégradation.
                 </div>
             `;
         }
 
-        // 3. Charger les données au démarrage
-        async function fetchMateriels() {
-            try {
-                console.log("Tentative de connexion à Supabase...");
-                const { data, error } = await supabase.from('materiels').select('*');
-                
-                if (error) throw error;
-                
-                console.log("Données reçues :", data);
-                itemsData = data || [];
-                renderInventory();
-                majContratVisuel();
-            } catch (err) {
-                console.error("Erreur Supabase détaillée :", err);
-                document.getElementById('inventory').innerHTML = `<p class='col-span-2 text-red-500'>Erreur : ${err.message}</p>`;
-            }
-        }
+        window.confirmerReservation = async () => {
+            const btn = document.getElementById('btnSubmit');
+            const nom = document.getElementById('nom_loueur').value;
+            const mail = document.getElementById('email_loueur').value;
+            if (!nom || !mail || panier.length === 0) return alert("Veuillez remplir vos infos et choisir du matériel.");
 
-        // Lancement effectif
+            btn.disabled = true;
+            btn.innerText = "Génération du contrat...";
+
+            const element = document.getElementById('pdf-render-zone');
+            const opt = { 
+                margin: 10, filename: `Contrat_${nom}.pdf`, 
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            try {
+                // 1. Sauvegarde PDF
+                await html2pdf().set(opt).from(element).save();
+                
+                // 2. Upload Supabase Storage
+                const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+                const filePath = `contrats/${Date.now()}_${nom}.pdf`;
+                await supabase.storage.from('contrats').upload(filePath, pdfBlob);
+                const { data: { publicUrl } } = supabase.storage.from('contrats').getPublicUrl(filePath);
+
+                // 3. Envoi EmailJS
+                await emailjs.send('service_63g35od', 'template_gb5d2wt', {
+                    nom_loueur: nom,
+                    email_destinataire: mail,
+                    lien_pdf: publicUrl
+                });
+
+                alert("Merci ! Votre réservation est envoyée et le contrat téléchargé.");
+                window.location.reload();
+            } catch (e) {
+                console.error(e);
+                alert("Erreur lors de la réservation.");
+                btn.disabled = false;
+                btn.innerText = "Confirmer & Télécharger le contrat";
+            }
+        };
+
+        // Démarrage
         fetchMateriels();
 
-        // Ecouteurs de saisie
         ['nom_loueur', 'email_loueur', 'tel_loueur', 'date_debut', 'date_fin'].forEach(id => {
             document.getElementById(id).addEventListener('input', majContratVisuel);
         });
-
     </script>
 </body>
 </html>
